@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Bell, Shield, HelpCircle, Info, Trophy } from 'lucide-react';
-import { getStats, getAchievements, getUserName, getMemberSince } from '@/lib/storage';
+import { ChevronRight, Bell, Shield, HelpCircle, Info, Trophy, LogOut } from 'lucide-react';
+import { getStats, getAchievements, getMemberSince } from '@/lib/storage';
 import { UserStats } from '@/types/wellness';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 const Profile = () => {
   const [userName, setUserName] = useState('User');
@@ -15,13 +18,27 @@ const Profile = () => {
     totalMeditationMinutes: 0,
   });
   const [achievements, setAchievements] = useState<any[]>([]);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     loadProfile();
   }, []);
 
-  const loadProfile = () => {
-    setUserName(getUserName());
+  const loadProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+      
+      if (profile?.full_name) {
+        setUserName(profile.full_name);
+      }
+    }
+
     const since = getMemberSince();
     const date = new Date(since);
     setMemberSince(date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }));
@@ -31,6 +48,19 @@ const Profile = () => {
     
     const userAchievements = getAchievements();
     setAchievements(userAchievements);
+  };
+
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to sign out.",
+        variant: "destructive",
+      });
+    } else {
+      navigate("/auth");
+    }
   };
 
   const settingsItems = [
@@ -111,6 +141,16 @@ const Profile = () => {
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </button>
             ))}
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-destructive/10 transition-colors text-destructive"
+            >
+              <div className="flex items-center gap-3">
+                <LogOut className="w-5 h-5" />
+                <span className="font-medium">Sign Out</span>
+              </div>
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
         </Card>
       </div>

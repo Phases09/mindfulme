@@ -2,16 +2,87 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Play, Brain, Wind, Moon, Sun, Leaf } from 'lucide-react';
+import { Search, Play, Brain, Wind, Moon, Sun, Leaf, Check } from 'lucide-react';
 import { wellnessExercises } from '@/data/exercises';
-import { saveActivity } from '@/lib/storage';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type CategoryFilter = 'all' | 'meditation' | 'breathing' | 'sleep';
 
 const Wellness = () => {
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const [isExercising, setIsExercising] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
+
+  const startExercise = (exerciseId: string, duration: number) => {
+    setSelectedExercise(exerciseId);
+    setIsExercising(true);
+    setTimeRemaining(duration * 60);
+
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          completeExercise(exerciseId, duration);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const completeExercise = async (exerciseId: string, duration: number) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be signed in to track activities.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from("wellness_activities")
+      .insert({
+        user_id: user.id,
+        exercise_id: exerciseId,
+        duration: duration,
+      });
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save activity.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Completed!",
+        description: "Great job! Your progress has been saved.",
+      });
+    }
+
+    setIsExercising(false);
+    setSelectedExercise(null);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const categories = [
     { id: 'all', label: 'All' },
@@ -40,24 +111,8 @@ const Wellness = () => {
     }
   };
 
-  const handleStartExercise = (exerciseId: string, title: string, duration: number, category: string) => {
-    const activityType = category === 'breathing' ? 'breathing' : 
-                        category === 'sleep' ? 'sleep' :
-                        category === 'motivation' ? 'motivation' : 'meditation';
-    
-    saveActivity({
-      id: Date.now().toString(),
-      type: activityType,
-      title,
-      duration,
-      timestamp: new Date(),
-      completed: true,
-    });
-    
-    toast({
-      title: 'Exercise started!',
-      description: `Enjoy your ${duration} minute session`,
-    });
+  const handleStartExercise = (exerciseId: string, duration: number) => {
+    startExercise(exerciseId, duration);
   };
 
   return (
@@ -97,12 +152,7 @@ const Wellness = () => {
                 size="icon"
                 variant="secondary"
                 className="rounded-full"
-                onClick={() => handleStartExercise(
-                  featuredExercise.id,
-                  featuredExercise.title,
-                  featuredExercise.duration,
-                  featuredExercise.category
-                )}
+                onClick={() => handleStartExercise(featuredExercise.id, featuredExercise.duration)}
               >
                 <Play className="w-4 h-4" />
               </Button>
@@ -154,12 +204,7 @@ const Wellness = () => {
                     size="icon"
                     variant="ghost"
                     className="rounded-full flex-shrink-0"
-                    onClick={() => handleStartExercise(
-                      exercise.id,
-                      exercise.title,
-                      exercise.duration,
-                      exercise.category
-                    )}
+                    onClick={() => handleStartExercise(exercise.id, exercise.duration)}
                   >
                     <Play className="w-4 h-4" />
                   </Button>
@@ -169,6 +214,36 @@ const Wellness = () => {
           })}
         </div>
       </div>
+
+      <Dialog open={isExercising} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Exercise in Progress</DialogTitle>
+            <DialogDescription>
+              Keep going! You're doing great.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-6 py-8">
+            <div className="text-6xl font-bold text-primary">
+              {formatTime(timeRemaining)}
+            </div>
+            <div className="w-full bg-muted rounded-full h-2">
+              <div
+                className="bg-primary h-2 rounded-full transition-all"
+                style={{
+                  width: `${((wellnessExercises.find(e => e.id === selectedExercise)?.duration || 0) * 60 - timeRemaining) / ((wellnessExercises.find(e => e.id === selectedExercise)?.duration || 0) * 60) * 100}%`,
+                }}
+              />
+            </div>
+            {timeRemaining === 0 && (
+              <div className="flex items-center gap-2 text-green-600">
+                <Check className="w-5 h-5" />
+                <span className="font-semibold">Complete!</span>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

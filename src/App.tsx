@@ -7,7 +7,9 @@ import Home from "./pages/Home";
 import Analytics from "./pages/Analytics";
 import Wellness from "./pages/Wellness";
 import Profile from "./pages/Profile";
+import Auth from "./pages/Auth";
 import BottomNav from "./components/BottomNav";
+import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -19,10 +21,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<><Home /><BottomNav /></>} />
-          <Route path="/analytics" element={<><Analytics /><BottomNav /></>} />
-          <Route path="/wellness" element={<><Wellness /><BottomNav /></>} />
-          <Route path="/profile" element={<><Profile /><BottomNav /></>} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/" element={<ProtectedRoute><Home /><BottomNav /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute><Analytics /><BottomNav /></ProtectedRoute>} />
+          <Route path="/wellness" element={<ProtectedRoute><Wellness /><BottomNav /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /><BottomNav /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
