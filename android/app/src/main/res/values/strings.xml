@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MindfulMe</string>
+    <string name="title_activity_main">MindfulMe</string>
+    <string name="package_name">com.github.MindfulMe</string>
+    <string name="custom_url_scheme">com.github.MindfulMe</string>
+</resources>
